@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foodies | Kitchen Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        foodies: { yellow: '#F5B301', darkText: '#111827' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Optimized Glassmorphism Utilities */
+        .glass-panel { 
+            background: rgba(255, 255, 255, 0.75); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(245, 179, 1, 0.2); 
+            box-shadow: 0 4px 20px 0 rgba(17, 24, 39, 0.05); 
+            transform: translateZ(0); 
+            will-change: transform;
+        }
+        
+        .dark .glass-panel { 
+            background: rgba(17, 24, 39, 0.85); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(245, 179, 1, 0.15); 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4); 
+            transform: translateZ(0);
+        }
+
+        /* Yellow & Dark Gray Mesh Gradient */
+        .mesh-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-color: #f3f4f6;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 179, 1, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 20%, rgba(17, 24, 39, 0.1) 0px, transparent 50%),
+                radial-gradient(at 20% 100%, rgba(245, 179, 1, 0.1) 0px, transparent 50%);
+        }
+
+        .dark .mesh-bg {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 179, 1, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 20%, rgba(17, 24, 39, 0.8) 0px, transparent 50%),
+                radial-gradient(at 20% 100%, rgba(245, 179, 1, 0.05) 0px, transparent 50%);
+        }
+    </style>
+</head>
+<body class="text-gray-800 dark:text-gray-200 font-sans h-screen overflow-hidden transition-colors duration-300 relative">
+    
+    <div class="mesh-bg"></div>
+    <div id="root" class="h-full relative z-10"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function KDSApp() {
+            const [viewMode, setViewMode] = useState('live'); 
+            const [orders, setOrders] = useState([]);
+            const [waitingOrders, setWaitingOrders] = useState([]);
+            const [menuItems, setMenuItems] = useState([]);
+            const [isConnected, setIsConnected] = useState(false);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            
+            const [settings, setSettings] = useState(() => {
+                const saved = localStorage.getItem('foodies_kds_settings');
+                return saved ? JSON.parse(saved) : { theme: 'dark', textSize: 'normal', highContrast: false, volume: 1.0, muted: false };
+            });
+            
+            const [activeStation, setActiveStation] = useState('All');
+            const [lastReadyOrder, setLastReadyOrder] = useState(null);
+            const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: '', image: '' });
+            const prevOrderIds = useRef(new Set());
+            const audioRef = useRef(new Audio('https://actions.google.com/sounds/v1/alarms/positive_bell.ogg'));
+
+            useEffect(() => {
+                if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+                
+                localStorage.setItem('foodies_kds_settings', JSON.stringify(settings));
+                localStorage.setItem('foodies_theme', settings.theme);
+                window.dispatchEvent(new Event('storage'));
+            }, [settings]);
+
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 10000); 
+                return () => clearInterval(timer);
+            }, []);
+
+            const fetchData = async () => {
+                try {
+                    const resActive = await fetch('/api/orders');
+                    if (resActive.ok) {
+                        const data = await resActive.json();
+                        
+                        const currentIds = new Set(data.active_orders.map(o => o.id));
+                        const hasNewOrder = data.active_orders.some(o => !prevOrderIds.current.has(o.id));
+                        
+                        if (hasNewOrder && prevOrderIds.current.size > 0 && !settings.muted) {
+                            audioRef.current.volume = settings.volume;
+                            audioRef.current.play().catch(e => console.log('Audio blocked pending user interaction.'));
+                        }
+                        
+                        prevOrderIds.current = currentIds;
+                        setOrders(data.active_orders);
+                        setIsConnected(true);
+                    } else setIsConnected(false);
+
+                    const resWaiting = await fetch('/api/waiting');
+                    if (resWaiting.ok) {
+                        const data = await resWaiting.json();
+                        setWaitingOrders(data.waiting_orders);
+                    }
+
+                    const resMenu = await fetch('/api/menu');
+                    if (resMenu.ok) {
+                        const data = await resMenu.json();
+                        setMenuItems(data.menu);
+                    }
+                } catch (error) {
+                    setIsConnected(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchData();
+                const interval = setInterval(fetchData, 3000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const markOrderReady = async (orderId) => {
+                setOrders(prev => prev.filter(o => o.id !== orderId));
+                setLastReadyOrder(orderId);
+                try {
+                    await fetch('/api/complete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order_id: String(orderId) }) 
+                    });
+                } catch (error) {
+                    fetchData(); 
+                }
+            };
+
+            const undoOrder = async () => {
+                if (!lastReadyOrder) return;
+                const idToUndo = lastReadyOrder;
+                setLastReadyOrder(null);
+                try {
+                    await fetch('/api/undo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order_id: String(idToUndo) }) 
+                    });
+                    fetchData(); 
+                } catch (error) {
+                    console.error("Failed to undo order");
+                }
+            };
+
+            const sweepOrder = async (orderId) => {
+                if(window.confirm(`Are you sure you want to delete unscanned order #${orderId}?`)) {
+                    setWaitingOrders(prev => prev.filter(o => o.id !== orderId));
+                    try {
+                        await fetch('/api/sweep', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order_id: String(orderId) }) 
+                        });
+                    } catch (error) {
+                        fetchData();
+                    }
+                }
+            };
+
+            const toggleStock = async (itemId) => {
+                setMenuItems(prev => prev.map(item => 
+                    item.id === itemId ? { ...item, in_stock: !item.in_stock } : item
+                ));
+                try {
+                    await fetch(`/api/menu/${itemId}`, { method: 'PUT' });
+                } catch (error) {
+                    fetchData(); 
+                }
+            };
+
+            const deleteMenuItem = async (itemId) => {
+                if(window.confirm('Delete this item from the menu permanently?')) {
+                    try {
+                        await fetch(`/api/menu/${itemId}`, { method: 'DELETE' });
+                        fetchData();
+                    } catch (error) {
+                        console.error("Failed to delete menu item");
+                    }
+                }
+            };
+
+            const addMenuItem = async (e) => {
+                e.preventDefault();
+                if (!newItem.name || !newItem.price || !newItem.category) return alert('Name, Price, and Category are required.');
+                try {
+                    const res = await fetch('/api/menu', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newItem)
+                    });
+                    if (res.ok) {
+                        setNewItem({ name: '', description: '', price: '', category: '', image: '' });
+                        fetchData();
+                    }
+                } catch (error) {
+                    console.error("Failed to add menu item");
+                }
+            };
+
+            const getWaitTime = (timeStr) => {
+                if (!timeStr) return 0;
+                const now = new Date();
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                const orderTime = new Date();
+                orderTime.setHours(hours, minutes, 0, 0);
+                if (orderTime > now) orderTime.setDate(orderTime.getDate() - 1);
+                return Math.floor((now - orderTime) / 60000);
+            };
+
+            const getTimerStyles = (minutes) => {
+                if (minutes >= 10) return "bg-gray-900 text-foodies-yellow dark:bg-white dark:text-gray-900 font-black animate-pulse border border-foodies-yellow";
+                if (minutes >= 5) return "bg-foodies-yellow text-gray-900 font-black border border-gray-900 dark:border-white";
+                return "bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-foodies-yellow border border-gray-300 dark:border-gray-700";
+            };
+
+            // Scaled down text sizes for compactness
+            const textSizeClass = settings.textSize === 'xl' ? 'text-lg' : settings.textSize === 'large' ? 'text-base' : 'text-sm';
+            const borderClass = settings.highContrast ? 'border-2 border-gray-800 dark:border-foodies-yellow shadow-xl' : '';
+
+            const categories = ['All', ...new Set(menuItems.map(m => m.category))];
+            
+            const filteredOrders = orders.filter(order => {
+                if (activeStation === 'All') return true;
+                return order.items.some(itemStr => {
+                    const name = itemStr.replace(/^\d+x\s/, '');
+                    const menuItem = menuItems.find(m => m.name === name);
+                    return menuItem && menuItem.category === activeStation;
+                });
+            });
+
+            return (
+                <div className="flex flex-col h-full w-full relative">
+                    
+                    <nav className="sticky top-2 md:top-4 z-50 flex items-center justify-between glass-panel rounded-full px-4 md:px-8 py-2 mx-3 md:mx-4 shadow-lg shrink-0">
+                        <div className="flex items-center space-x-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 rounded-full bg-gray-800 dark:bg-foodies-yellow flex items-center justify-center shadow-md border border-foodies-yellow dark:border-gray-900">
+                                    <span className="font-black text-foodies-yellow dark:text-gray-900 text-xs">F</span>
+                                </div>
+                                <span className="font-serif font-black text-lg md:text-xl tracking-tight text-gray-900 dark:text-foodies-yellow drop-shadow-sm">Foodies KDS.</span>
+                            </div>
+                            
+                            <div className="hidden md:flex space-x-3 ml-4">
+                                <button onClick={() => setViewMode('live')} className={`px-4 py-1.5 rounded-full font-black text-xs transition-all shadow-sm ${viewMode === 'live' ? 'bg-foodies-yellow text-gray-900' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}>
+                                    Live Kitchen <span className="ml-1 opacity-70">({orders.length})</span>
+                                </button>
+                                <button onClick={() => setViewMode('sweep')} className={`px-4 py-1.5 rounded-full font-black text-xs transition-all shadow-sm ${viewMode === 'sweep' ? 'bg-foodies-yellow text-gray-900' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}>
+                                    Unscanned <span className="ml-1 opacity-70">({waitingOrders.length})</span>
+                                </button>
+                                <button onClick={() => setViewMode('menu')} className={`px-4 py-1.5 rounded-full font-black text-xs transition-all shadow-sm ${viewMode === 'menu' ? 'bg-foodies-yellow text-gray-900' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}>
+                                    Menu Manager
+                                </button>
+                                <button onClick={() => setViewMode('settings')} className={`px-4 py-1.5 rounded-full font-black text-xs transition-all shadow-sm ${viewMode === 'settings' ? 'bg-foodies-yellow text-gray-900' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}>
+                                    <i className="fas fa-cog mr-1"></i> Config
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                            {lastReadyOrder && (
+                                <button onClick={undoOrder} className="text-foodies-yellow bg-gray-900 px-3 py-1.5 rounded-full font-black text-xs hover:bg-gray-800 transition shadow-md border border-foodies-yellow/30">
+                                    <i className="fas fa-undo mr-1"></i> Undo #{lastReadyOrder}
+                                </button>
+                            )}
+                            <div className={`hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black shadow-inner border ${isConnected ? 'border-foodies-yellow text-gray-900 dark:text-foodies-yellow bg-foodies-yellow/10' : 'border-gray-500 text-gray-500 bg-gray-200 dark:bg-gray-800'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-foodies-yellow animate-pulse' : 'bg-gray-500'}`}></div>
+                                <span>{isConnected ? 'ONLINE' : 'OFFLINE'}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-gray-800 dark:text-foodies-yellow font-black text-sm border-l border-gray-300 dark:border-gray-700 pl-4">
+                                <i className="fas fa-clock"></i>
+                                <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="flex-grow overflow-y-auto hide-scrollbar pt-4 pb-4">
+                        
+                        {/* LIVE KITCHEN VIEW */}
+                        {viewMode === 'live' && (
+                            <div className="px-4 h-full flex gap-4">
+                                <div className="flex-grow flex flex-col">
+                                    <div className="flex space-x-2 overflow-x-auto pb-3 hide-scrollbar">
+                                        {categories.map(cat => (
+                                            <button key={cat} onClick={() => setActiveStation(cat)} className={`px-4 py-1.5 rounded-lg font-black text-xs whitespace-nowrap transition-all shadow-sm ${activeStation === cat ? 'bg-gray-800 dark:bg-foodies-yellow text-foodies-yellow dark:text-gray-900 border border-foodies-yellow dark:border-gray-900' : 'glass-panel text-gray-600 dark:text-gray-300 hover:bg-white/50'}`}>
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="flex-grow overflow-y-auto hide-scrollbar pb-6">
+                                        {filteredOrders.length === 0 ? (
+                                            <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-600 mt-10">
+                                                <i className="fas fa-check-circle text-6xl mb-4 text-foodies-yellow opacity-80"></i>
+                                                <h2 className="text-2xl font-serif font-black text-gray-800 dark:text-gray-200">Kitchen is clear</h2>
+                                                <p className="text-xs mt-2 font-bold uppercase tracking-widest">Awaiting Tickets</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col space-y-2">
+                                                {filteredOrders.map((order) => {
+                                                    const waitMins = getWaitTime(order.scanned_at || order.created_at);
+                                                    return (
+                                                    <div key={order.id} className={`glass-panel rounded-xl flex items-center px-3 py-2 transition-all shadow-sm ${borderClass}`}>
+                                                        
+                                                        {/* Extremely compact ID Container */}
+                                                        <div className="w-16 shrink-0 flex flex-col justify-center border-r border-gray-300/50 dark:border-gray-600/50 pr-3 mr-3">
+                                                            <h3 className="font-black text-2xl tracking-tight text-gray-900 dark:text-foodies-yellow leading-none">#{order.id}</h3>
+                                                            <p className="font-bold text-gray-600 dark:text-gray-400 text-[9px] mt-0.5 uppercase tracking-wider truncate">{order.name}</p>
+                                                        </div>
+                                                        
+                                                        {/* Horizontal Book-like Item List */}
+                                                        <div className={`flex-grow font-mono font-bold text-gray-900 dark:text-gray-100 ${textSizeClass} leading-tight`}>
+                                                            {order.items.join('  •  ')}
+                                                        </div>
+                                                        
+                                                        {/* Compact Actions Container */}
+                                                        <div className="flex items-center shrink-0 space-x-3 pl-3 border-l border-gray-300/50 dark:border-gray-600/50">
+                                                            <div className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold flex items-center backdrop-blur-sm ${getTimerStyles(waitMins)}`}>
+                                                                {waitMins}m
+                                                            </div>
+                                                            <button onClick={() => markOrderReady(order.id)} className={`px-4 py-1.5 rounded-lg transition flex justify-center items-center uppercase tracking-widest bg-foodies-yellow text-gray-900 shadow-sm hover:bg-yellow-400 border border-yellow-500 font-black text-xs`}>
+                                                                Ready
+                                                            </button>
+                                                        </div>
+                                                        
+                                                    </div>
+                                                )})}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="w-64 shrink-0 hidden lg:flex flex-col glass-panel rounded-2xl overflow-hidden h-[calc(100vh-100px)] border border-gray-300 dark:border-gray-700">
+                                    <div className="p-3 bg-gray-800 dark:bg-foodies-yellow border-b border-gray-900 flex justify-between items-center">
+                                        <h3 className="font-black text-sm text-foodies-yellow dark:text-gray-900 uppercase tracking-widest"><i className="fas fa-bolt mr-1"></i>Quick 86</h3>
+                                    </div>
+                                    <div className="flex-grow overflow-y-auto p-2 space-y-2 hide-scrollbar bg-white/30 dark:bg-gray-900/30">
+                                        {menuItems.map(item => (
+                                            <div key={item.id} className="flex justify-between items-center p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-sm">
+                                                <span className={`font-mono text-xs truncate pr-2 ${!item.in_stock ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-foodies-yellow font-bold'}`}>{item.name}</span>
+                                                <button onClick={() => toggleStock(item.id)} className={`shrink-0 px-2 py-1 rounded-sm text-[9px] font-black uppercase transition-colors border ${item.in_stock ? 'bg-foodies-yellow text-gray-900 border-gray-900' : 'bg-gray-800 text-gray-400 border-gray-600'}`}>
+                                                    {item.in_stock ? 'IN STOCK' : '86'}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* UNSCANNED SWEEPS VIEW */}
+                        {viewMode === 'sweep' && (
+                            <div className="px-6 h-full max-w-5xl mx-auto">
+                                {waitingOrders.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                                        <i className="fas fa-broom text-6xl mb-4 text-foodies-yellow opacity-50"></i>
+                                        <h2 className="text-2xl font-serif font-black text-gray-800 dark:text-gray-200">No unscanned tickets</h2>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col space-y-2">
+                                        {waitingOrders.map((order) => (
+                                            <div key={order.id} className="glass-panel border-l-4 border-gray-800 dark:border-foodies-yellow rounded-xl flex items-center px-3 py-2 animate-fade-in opacity-90 hover:opacity-100 transition shadow-sm">
+                                                
+                                                <div className="w-20 shrink-0 flex flex-col justify-center border-r border-gray-300/50 dark:border-gray-600/50 pr-3 mr-3">
+                                                    <span className="bg-gray-800 text-foodies-yellow text-[8px] font-black px-1 py-0.5 rounded-[2px] uppercase tracking-wider w-max mb-0.5">Unscanned</span>
+                                                    <h3 className="font-black text-xl tracking-tight text-gray-900 dark:text-white leading-none">#{order.id}</h3>
+                                                </div>
+                                                
+                                                <div className={`flex-grow font-mono font-bold text-gray-800 dark:text-gray-200 ${textSizeClass}`}>
+                                                    {order.items.join('  •  ')}
+                                                </div>
+                                                
+                                                <div className="flex items-center shrink-0 space-x-3 pl-3 border-l border-gray-300/50 dark:border-gray-600/50">
+                                                    <div className="text-right">
+                                                        <p className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate w-20 uppercase">{order.name}</p>
+                                                        <p className="font-mono text-[10px] font-bold text-gray-500 mt-0.5"><i className="fas fa-clock mr-1 text-foodies-yellow"></i> {order.created_at}</p>
+                                                    </div>
+                                                    <button onClick={() => sweepOrder(order.id)} className="px-4 py-1.5 bg-gray-800 text-foodies-yellow hover:bg-gray-900 font-black text-xs rounded-lg uppercase tracking-widest transition-colors shadow-sm border border-gray-900">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* MENU MANAGER VIEW */}
+                        {viewMode === 'menu' && (
+                            <div className="px-4 max-w-6xl mx-auto h-full flex flex-col md:flex-row gap-6">
+                                <div className="w-full md:w-2/3 glass-panel rounded-2xl overflow-hidden flex flex-col border border-gray-300 dark:border-gray-700">
+                                    <div className="p-4 bg-gray-800 dark:bg-gray-900 border-b border-gray-700"><h2 className="text-xl font-serif font-black text-foodies-yellow">Current Menu</h2></div>
+                                    <div className="p-4 overflow-y-auto flex-grow space-y-3 hide-scrollbar bg-white/40 dark:bg-gray-800/40">
+                                        {menuItems.map(item => (
+                                            <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${item.in_stock ? 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600 shadow-sm' : 'bg-gray-200/50 dark:bg-gray-900/50 border-gray-300/50 dark:border-gray-700/50 opacity-60'}`}>
+                                                <div className="flex items-center space-x-4">
+                                                    <div className="w-14 h-14 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center p-2 border border-gray-200 dark:border-gray-700 shadow-inner">
+                                                        <img src={item.image || 'https://via.placeholder.com/150'} alt={item.name} className="w-full h-full object-contain" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-black text-sm text-gray-900 dark:text-white">{item.name} <span className="text-gray-500 font-bold text-xs ml-1">({item.category})</span></h3>
+                                                        <p className="text-foodies-yellow font-black text-base">${item.price.toFixed(2)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <button onClick={() => toggleStock(item.id)} className={`px-3 py-1.5 rounded-lg font-black text-xs transition shadow-sm border ${item.in_stock ? 'bg-foodies-yellow text-gray-900 border-gray-900 hover:bg-yellow-400' : 'bg-gray-800 text-gray-400 border-gray-600'}`}>
+                                                        {item.in_stock ? 'IN STOCK' : '86 ITEM'}
+                                                    </button>
+                                                    <button onClick={() => deleteMenuItem(item.id)} className="w-8 h-8 rounded-lg bg-gray-800 text-foodies-yellow hover:bg-foodies-yellow hover:text-gray-900 transition flex items-center justify-center shadow-sm border border-gray-700">
+                                                        <i className="fas fa-trash-alt text-sm"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="w-full md:w-1/3 glass-panel rounded-2xl p-6 h-fit border border-gray-300 dark:border-gray-700">
+                                    <h2 className="text-xl font-serif font-black text-gray-900 dark:text-foodies-yellow mb-4">Add New Item</h2>
+                                    <form onSubmit={addMenuItem} className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-300 mb-1">Item Name</label>
+                                            <input type="text" required value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full bg-white/80 dark:bg-gray-900/80 border border-gray-300 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-foodies-yellow transition font-bold shadow-inner" placeholder="e.g. Spicy Fries" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-300 mb-1">Category</label>
+                                            <input type="text" required value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-full bg-white/80 dark:bg-gray-900/80 border border-gray-300 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-foodies-yellow transition font-bold shadow-inner" placeholder="e.g. Sides" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-300 mb-1">Price ($)</label>
+                                            <input type="number" step="0.01" required value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full bg-white/80 dark:bg-gray-900/80 border border-gray-300 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-foodies-yellow transition font-bold shadow-inner" placeholder="e.g. 3.50" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-300 mb-1">Image URL (Optional)</label>
+                                            <input type="text" value={newItem.image} onChange={e => setNewItem({...newItem, image: e.target.value})} className="w-full bg-white/80 dark:bg-gray-900/80 border border-gray-300 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-foodies-yellow transition font-bold shadow-inner" placeholder="https://..." />
+                                        </div>
+                                        <button type="submit" className="w-full bg-foodies-yellow text-gray-900 font-black py-3 rounded-lg mt-4 transition shadow-sm flex justify-center items-center hover:bg-yellow-400 uppercase tracking-widest text-sm border border-gray-900">
+                                            <i className="fas fa-plus-circle mr-2"></i> Add to Menu
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SETTINGS VIEW */}
+                        {viewMode === 'settings' && (
+                            <div className="max-w-3xl mx-auto pt-6 animate-fade-in pb-10">
+                                <h2 className="text-3xl font-serif font-black text-gray-900 dark:text-foodies-yellow mb-6">System Configuration</h2>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="glass-panel rounded-2xl p-6 border border-gray-300 dark:border-gray-700">
+                                        <div className="flex items-center space-x-4 mb-5">
+                                            <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center text-foodies-yellow shadow-md border border-gray-900"><i className="fas fa-desktop"></i></div>
+                                            <div>
+                                                <h3 className="font-black text-lg text-gray-900 dark:text-white">Display & Theme</h3>
+                                                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-0.5">Controls KDS color profile.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-5">
+                                            <div>
+                                                <label className="block text-xs font-black text-gray-800 dark:text-gray-300 mb-2 uppercase tracking-wider">Color Mode</label>
+                                                <div className="flex space-x-3">
+                                                    <button onClick={() => setSettings({...settings, theme: 'light'})} className={`flex-1 py-2 rounded-lg font-black text-xs border-2 transition ${settings.theme === 'light' ? 'border-gray-900 bg-foodies-yellow text-gray-900 shadow-md' : 'border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400'}`}><i className="fas fa-sun mr-2"></i>Light</button>
+                                                    <button onClick={() => setSettings({...settings, theme: 'dark'})} className={`flex-1 py-2 rounded-lg font-black text-xs border-2 transition ${settings.theme === 'dark' ? 'border-foodies-yellow bg-gray-800 text-foodies-yellow shadow-md' : 'border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400'}`}><i className="fas fa-moon mr-2"></i>Dark</button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="border-t border-gray-300 dark:border-gray-700 pt-5">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-black text-sm text-gray-900 dark:text-white uppercase tracking-wider">High Contrast</h4>
+                                                        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-0.5">Thicker ticket borders.</p>
+                                                    </div>
+                                                    <button onClick={() => setSettings({...settings, highContrast: !settings.highContrast})} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner ${settings.highContrast ? 'bg-foodies-yellow' : 'bg-gray-300 dark:bg-gray-700'}`}>
+                                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-gray-900 transition-transform shadow-sm ${settings.highContrast ? 'right-1' : 'left-1'}`}></div>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-panel rounded-2xl p-6 border border-gray-300 dark:border-gray-700">
+                                        <div className="flex items-center space-x-4 mb-5">
+                                            <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center text-foodies-yellow shadow-md border border-gray-900"><i className="fas fa-layer-group"></i></div>
+                                            <div>
+                                                <h3 className="font-black text-lg text-gray-900 dark:text-white">Ticket Readability</h3>
+                                                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-0.5">Adjust item text size.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-xs font-black text-gray-800 dark:text-gray-300 mb-2 uppercase tracking-wider">Text Size</label>
+                                            <div className="flex space-x-2">
+                                                <button onClick={() => setSettings({...settings, textSize: 'normal'})} className={`flex-1 py-2 rounded-lg font-black text-xs border-2 transition ${settings.textSize === 'normal' ? 'border-gray-900 dark:border-foodies-yellow bg-foodies-yellow dark:bg-gray-800 text-gray-900 dark:text-foodies-yellow shadow-md' : 'border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400'}`}>SM</button>
+                                                <button onClick={() => setSettings({...settings, textSize: 'large'})} className={`flex-1 py-2 rounded-lg font-black text-xs border-2 transition ${settings.textSize === 'large' ? 'border-gray-900 dark:border-foodies-yellow bg-foodies-yellow dark:bg-gray-800 text-gray-900 dark:text-foodies-yellow shadow-md' : 'border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400'}`}>MD</button>
+                                                <button onClick={() => setSettings({...settings, textSize: 'xl'})} className={`flex-1 py-2 rounded-lg font-black text-xs border-2 transition ${settings.textSize === 'xl' ? 'border-gray-900 dark:border-foodies-yellow bg-foodies-yellow dark:bg-gray-800 text-gray-900 dark:text-foodies-yellow shadow-md' : 'border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400'}`}>LG</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="glass-panel rounded-2xl p-6 md:col-span-2 border border-gray-300 dark:border-gray-700">
+                                        <div className="flex items-center space-x-4 mb-5">
+                                            <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center text-foodies-yellow shadow-md border border-gray-900"><i className="fas fa-volume-up"></i></div>
+                                            <div>
+                                                <h3 className="font-black text-lg text-gray-900 dark:text-white">Audio Notifications</h3>
+                                                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-0.5">Manage new ticket bells.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 mr-8">
+                                                <label className="block text-xs font-black text-gray-800 dark:text-gray-300 mb-2 uppercase tracking-wider">Volume Level</label>
+                                                <input type="range" min="0" max="1" step="0.1" value={settings.volume} onChange={(e) => setSettings({...settings, volume: parseFloat(e.target.value)})} disabled={settings.muted} className="w-full h-1.5 bg-gray-300/80 rounded-lg appearance-none cursor-pointer dark:bg-gray-700/80 disabled:opacity-30 accent-foodies-yellow" />
+                                            </div>
+                                            <div className="border-l border-gray-300 dark:border-gray-700 pl-6 flex flex-col items-center">
+                                                <label className="block text-xs font-black text-gray-800 dark:text-gray-300 mb-2 uppercase tracking-wider">Mute</label>
+                                                <button onClick={() => setSettings({...settings, muted: !settings.muted})} className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-colors shadow-inner border border-gray-400 dark:border-gray-700 ${settings.muted ? 'bg-gray-800 text-foodies-yellow' : 'bg-white/60 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400'}`}>
+                                                    <i className={`fas ${settings.muted ? 'fa-volume-mute' : 'fa-volume-up'}`}></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<KDSApp />);
+    </script>
+    <style>
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foodies | Order Dispatch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        foodies: { yellow: '#F5B301', darkText: '#111827' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .glass-panel { 
+            background: rgba(255, 255, 255, 0.75); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(245, 179, 1, 0.2); 
+            box-shadow: 0 4px 20px 0 rgba(17, 24, 39, 0.05); 
+            transform: translateZ(0); 
+            will-change: transform;
+        }
+        
+        .dark .glass-panel { 
+            background: rgba(17, 24, 39, 0.85); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(245, 179, 1, 0.15); 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4); 
+            transform: translateZ(0);
+        }
+
+        .mesh-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-color: #f3f4f6;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 179, 1, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 20%, rgba(17, 24, 39, 0.1) 0px, transparent 50%),
+                radial-gradient(at 20% 100%, rgba(245, 179, 1, 0.1) 0px, transparent 50%);
+        }
+
+        .dark .mesh-bg {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 179, 1, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 20%, rgba(17, 24, 39, 0.8) 0px, transparent 50%),
+                radial-gradient(at 20% 100%, rgba(245, 179, 1, 0.05) 0px, transparent 50%);
+        }
+
+        #qr-reader { width: 100% !important; border: none !important; background: transparent; border-radius: 1rem; overflow: hidden; }
+        #qr-reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
+        #qr-reader__scan_region { background: transparent !important; }
+        #qr-reader__dashboard_section_csr span { display: none !important; }
+        #qr-reader__dashboard_section_swaplink { display: none !important; }
+        
+        @keyframes scan { 0%, 100% { top: 5%; } 50% { top: 95%; } }
+    </style>
+</head>
+<body class="text-gray-800 dark:text-gray-200 font-sans h-screen overflow-hidden flex flex-col transition-colors duration-300 relative">
+    
+    <div class="mesh-bg"></div>
+    <div id="root" class="h-full w-full flex flex-col relative z-10"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function DispatchApp() {
+            const [readyOrders, setReadyOrders] = useState([]);
+            const [scanInput, setScanInput] = useState("");
+            const [status, setStatus] = useState({ message: "Awaiting collection scan...", type: "normal" });
+            const [isConnected, setIsConnected] = useState(true);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const isProcessingRef = useRef(false);
+            
+            const [theme, setTheme] = useState(localStorage.getItem('foodies_theme') || 'light');
+            
+            useEffect(() => {
+                if (theme === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [theme]);
+
+            useEffect(() => {
+                const handleStorage = () => setTheme(localStorage.getItem('foodies_theme') || 'light');
+                window.addEventListener('storage', handleStorage);
+                const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => {
+                    window.removeEventListener('storage', handleStorage);
+                    clearInterval(timeInterval);
+                };
+            }, []);
+
+            const fetchOrders = async () => {
+                try {
+                    const response = await fetch('/api/board');
+                    if (response.ok) {
+                        try {
+                            const data = await response.json();
+                            setReadyOrders(data.ready || []);
+                            setIsConnected(true);
+                        } catch (parseError) {
+                            console.warn("Data formatting hiccup received from server. Staying online.");
+                            setIsConnected(true);
+                        }
+                    } else {
+                        setIsConnected(false);
+                    }
+                } catch (error) {
+                    setIsConnected(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchOrders();
+                const interval = setInterval(fetchOrders, 3000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Consolidated processing function for Scanner, Typing, and Manual button
+            const processCollection = async (payloadText) => {
+                if (isProcessingRef.current) return;
+                isProcessingRef.current = true; 
+                
+                setStatus({ message: "Verifying ticket...", type: "processing" });
+
+                // Guarantee we are only sending the raw number to the Python backend
+                let pureId = String(payloadText).replace("FOODIES_ORDER:", "").replace("MANUAL_ENTRY:", "").replace("#", "").trim();
+
+                try {
+                    const response = await fetch('/api/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        // Send both so it works regardless of how Python is configured
+                        body: JSON.stringify({ order_id: pureId, qr_payload: payloadText })
+                    });
+
+                    let data = {};
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        console.warn("Non-JSON clear response.");
+                    }
+
+                    if (response.ok) {
+                        // Optimistically remove it from UI instantly
+                        setReadyOrders(prev => prev.filter(o => String(o.id) !== pureId));
+                        
+                        setStatus({ message: `Verified! Hand over #${pureId}.`, type: "success" });
+                        setScanInput("");
+                        fetchOrders(); 
+                        
+                        setTimeout(() => {
+                            setStatus({ message: "Awaiting next collection scan...", type: "normal" });
+                            isProcessingRef.current = false; 
+                        }, 4000);
+                    } else {
+                        setStatus({ message: `FAILED: ${data.error || 'TICKET NOT READY'}`, type: "error" });
+                        setTimeout(() => {
+                            setStatus({ message: "Awaiting collection scan...", type: "normal" });
+                            isProcessingRef.current = false;
+                        }, 3000);
+                    }
+                } catch (error) {
+                    setStatus({ message: "Network error checking ticket.", type: "error" });
+                    setTimeout(() => {
+                        setStatus({ message: "Awaiting collection scan...", type: "normal" });
+                        isProcessingRef.current = false;
+                    }, 3000);
+                }
+            };
+
+            useEffect(() => {
+                const html5QrCode = new Html5Qrcode("qr-reader");
+                const qrCodeSuccessCallback = (decodedText) => {
+                    if (!isProcessingRef.current) {
+                        processCollection(decodedText);
+                    }
+                };
+                
+                const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+
+                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                const isSecure = window.location.protocol === 'https:';
+
+                if (!isLocalhost && !isSecure) {
+                    setStatus({ message: "Mobile Camera Blocked: Requires HTTPS.", type: "error" });
+                    return;
+                }
+
+                html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                    .catch((err) => {
+                        Html5Qrcode.getCameras().then(devices => {
+                            if (devices && devices.length > 0) {
+                                html5QrCode.start(devices[0].id, config, qrCodeSuccessCallback).catch(() => {
+                                    setStatus({ message: "Camera denied. Use manual clear.", type: "error" });
+                                });
+                            } else {
+                                setStatus({ message: "No camera found.", type: "error" });
+                            }
+                        }).catch(() => {
+                            setStatus({ message: "Camera blocked. Check HTTPS.", type: "error" });
+                        });
+                    });
+
+                return () => {
+                    if (html5QrCode.isScanning) html5QrCode.stop().catch(console.error);
+                };
+            }, []);
+
+            const handleManualSubmit = (e) => {
+                e.preventDefault();
+                if (!scanInput) return;
+                processCollection(scanInput);
+            };
+
+            const handleDeliver = (orderId) => {
+                // Route the manual button click through the same visual success flow
+                processCollection(String(orderId));
+            };
+
+            return (
+                <div className="flex flex-col h-full w-full relative">
+                    
+                    <nav className="sticky top-2 md:top-4 z-50 flex items-center justify-between glass-panel rounded-full px-4 md:px-8 py-2 mx-3 md:mx-4 shadow-lg shrink-0">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-8 h-8 rounded-full bg-gray-800 dark:bg-foodies-yellow flex items-center justify-center shadow-md border border-foodies-yellow dark:border-gray-900">
+                                <span className="font-black text-foodies-yellow dark:text-gray-900 text-xs">F</span>
+                            </div>
+                            <span className="font-serif font-black text-lg md:text-xl tracking-tight text-gray-900 dark:text-foodies-yellow drop-shadow-sm">Scan-to-Collect Handover</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black shadow-inner border tracking-widest uppercase ${isConnected ? 'border-foodies-yellow text-gray-900 dark:text-foodies-yellow bg-foodies-yellow/10' : 'border-gray-500 text-gray-500 bg-gray-200 dark:bg-gray-800'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-foodies-yellow animate-pulse' : 'bg-gray-500'}`}></div>
+                                <span className="hidden sm:inline">{isConnected ? 'SYSTEM ONLINE' : 'OFFLINE'}</span>
+                                <span className="inline sm:hidden">{isConnected ? 'ONLINE' : 'OFFLINE'}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-gray-800 dark:text-foodies-yellow font-black text-sm border-l border-gray-300 dark:border-gray-700 pl-4">
+                                <i className="fas fa-clock"></i>
+                                <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="flex-grow flex flex-col lg:flex-row gap-8 p-6 overflow-hidden pt-6 pb-20 max-w-[1400px] mx-auto w-full">
+                        
+                        {/* LEFT COLUMN: SCANNER */}
+                        <div className="w-full lg:w-1/3 flex flex-col items-center shrink-0 space-y-6">
+                            
+                            <div className="glass-panel p-3 rounded-[2rem] border-2 border-foodies-yellow dark:border-foodies-yellow shadow-[0_0_30px_rgba(245,179,1,0.15)] relative flex flex-col items-center justify-center w-64 h-64 md:w-80 md:h-80 w-full max-w-sm">
+                                <div className="absolute top-0 w-full h-1 bg-foodies-yellow opacity-80 animate-[scan_2s_ease-in-out_infinite] shadow-[0_5px_15px_rgba(245,179,1,0.6)] z-20 pointer-events-none"></div>
+                                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-foodies-yellow rounded-tl-[1.5rem] m-4 z-20"></div>
+                                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-foodies-yellow rounded-tr-[1.5rem] m-4 z-20"></div>
+                                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-foodies-yellow rounded-bl-[1.5rem] m-4 z-20"></div>
+                                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-foodies-yellow rounded-br-[1.5rem] m-4 z-20"></div>
+                                <div id="qr-reader" className="w-full h-full absolute inset-0 z-10 bg-gray-900/10 dark:bg-black/50"></div>
+                            </div>
+
+                            <div className="flex flex-col w-full max-w-sm space-y-4">
+                                <div className={`px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-md border-2 text-center transition-all duration-300 ${
+                                    status.type === 'success' ? 'bg-green-500 text-white border-green-600' : 
+                                    status.type === 'error' ? 'bg-red-600 text-white border-red-800' : 
+                                    status.type === 'processing' ? 'bg-gray-800 text-foodies-yellow border-gray-900' :
+                                    'glass-panel text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700'
+                                }`}>
+                                    {status.type === 'success' && <i className="fas fa-check-circle mr-2"></i>}
+                                    {status.type === 'error' && <i className="fas fa-exclamation-triangle mr-2"></i>}
+                                    {status.type === 'processing' && <i className="fas fa-spinner fa-spin mr-2"></i>}
+                                    {status.message}
+                                </div>
+
+                                <form onSubmit={handleManualSubmit} className="glass-panel p-6 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-md">
+                                    <p className="text-[10px] text-gray-600 dark:text-gray-400 font-bold uppercase tracking-widest mb-3 text-center">Scan QR or Type Ticket #</p>
+                                    <div className="flex flex-col space-y-3">
+                                        <input 
+                                            type="text" 
+                                            value={scanInput}
+                                            onChange={(e) => setScanInput(e.target.value)}
+                                            placeholder="e.g. 124"
+                                            className="w-full bg-white/60 dark:bg-gray-900/60 border-2 border-gray-300 dark:border-gray-700 rounded-xl p-3 text-center text-xl focus:outline-none focus:border-foodies-yellow font-mono font-black transition-colors uppercase text-gray-900 dark:text-foodies-yellow shadow-inner placeholder-gray-400"
+                                        />
+                                        <button type="submit" className="w-full bg-gray-900 text-foodies-yellow hover:bg-black font-black text-sm py-3 rounded-xl transition-colors shadow-sm border border-gray-800 uppercase tracking-widest">
+                                            Clear Ticket
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: LIST */}
+                        <div className="w-full lg:w-2/3 flex flex-col h-full bg-white/30 dark:bg-gray-800/30 rounded-[2.5rem] border border-gray-300/50 dark:border-gray-700/50 p-6 shadow-inner">
+                            <div className="flex justify-between items-center pb-4 mb-4 border-b border-gray-300/50 dark:border-gray-700/50 shrink-0">
+                                <div>
+                                    <h2 className="text-2xl font-serif font-black text-gray-900 dark:text-white">Awaiting Handover</h2>
+                                    <p className="text-gray-600 dark:text-gray-400 font-bold mt-1 text-[10px] uppercase tracking-widest">Verify items before dispatch</p>
+                                </div>
+                                <div className="bg-gray-800 text-foodies-yellow px-3 py-1 rounded-lg font-mono font-black text-sm shadow-md">
+                                    {readyOrders.length} Orders
+                                </div>
+                            </div>
+                            
+                            <div className="flex-grow overflow-y-auto hide-scrollbar">
+                                {readyOrders.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                                        <i className="fas fa-box-open text-5xl mb-4 opacity-50"></i>
+                                        <h3 className="text-lg font-black uppercase tracking-widest">No Orders Pending</h3>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col space-y-3">
+                                        {readyOrders.map((order) => (
+                                            <div key={order.id} className="glass-panel border-l-4 border-foodies-yellow rounded-xl flex items-center px-4 py-3 animate-fade-in transition-all shadow-sm">
+                                                
+                                                <div className="w-20 shrink-0 flex flex-col justify-center border-r border-gray-300/50 dark:border-gray-600/50 pr-3 mr-3">
+                                                    <h3 className="font-black text-2xl tracking-tight text-gray-900 dark:text-white leading-none">#{order.id}</h3>
+                                                    <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 mt-1 uppercase tracking-wider truncate">{order.name}</span>
+                                                </div>
+                                                
+                                                <div className="flex-grow font-mono font-bold text-gray-900 dark:text-gray-100 text-xs md:text-sm leading-tight pr-4">
+                                                    {order.items.join('  •  ')}
+                                                </div>
+                                                
+                                                <div className="flex items-center shrink-0 border-l border-gray-300/50 dark:border-gray-600/50 pl-3">
+                                                    <button onClick={() => handleDeliver(order.id)} className="px-4 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-foodies-yellow hover:text-gray-900 font-black text-xs rounded-lg uppercase tracking-widest transition-colors shadow-sm border border-gray-300 dark:border-gray-700 hover:border-yellow-500">
+                                                        Manual
+                                                    </button>
+                                                </div>
+                                                
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <footer className="w-full py-3 glass-panel border-t border-gray-300/50 dark:border-gray-700/50 text-center shrink-0 absolute bottom-0 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.02)] transition-colors duration-300 rounded-none border-x-0 border-b-0">
+                        <div className="flex items-center justify-center space-x-3 text-gray-600 dark:text-gray-400 font-bold text-[10px] tracking-[0.2em] uppercase">
+                            <span className="w-6 h-[1px] bg-gray-400 dark:bg-gray-600"></span>
+                            <p>System Developed by Bowen</p>
+                            <span className="w-6 h-[1px] bg-gray-400 dark:bg-gray-600"></span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DispatchApp />);
+    </script>
+    <style>
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</body>
+</html>

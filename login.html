@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Foodies</title>
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        foodies: {
+                            yellow: '#F5B301', 
+                            darkText: '#111827', 
+                            lightBg: '#FFFFFF',
+                            offWhite: '#F9FAFB'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-foodies-darkText font-sans">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState } = React;
+
+        function LoginApp() {
+            const [email, setEmail] = useState("");
+            const [password, setPassword] = useState("");
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if(!email || !password) {
+                    alert("Please fill in both email and password.");
+                    return;
+                }
+                
+                // Simulate a login process for the prototype
+                alert(`Welcome back, ${email}! Redirecting to menu...`);
+                window.location.href = 'index.html'; 
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-hidden">
+                    
+                    {/* Glassy Floating Sticky Pill Navbar */}
+                    <nav className="sticky top-2 md:top-4 z-50 flex items-center justify-between bg-white/40 backdrop-blur-xl rounded-full px-6 md:px-10 py-3 mx-3 md:mx-6 shadow-lg border border-white/50 transition-all">
+                        <div className="flex items-center space-x-6">
+                            <a href="index.html" className="flex items-center space-x-2 group">
+                                <div className="w-8 h-8 rounded-full bg-foodies-yellow flex items-center justify-center shadow-sm group-hover:scale-105 transition">
+                                    <span className="font-black text-black text-sm">F</span>
+                                </div>
+                                <span className="font-black text-xl md:text-2xl tracking-tight text-black drop-shadow-sm group-hover:text-foodies-yellow transition">Foodies.</span>
+                            </a>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <a href="index.html#menu-section" className="px-5 py-2 text-sm font-bold bg-foodies-yellow text-black rounded-full hover:bg-yellow-400 transition-all shadow-md hover:shadow-lg">Back to Menu</a>
+                        </div>
+                    </nav>
+
+                    {/* Login Content Area */}
+                    <div className="flex-grow flex items-center justify-center px-4 py-12 relative z-10">
+                        
+                        {/* Background glowing effects */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+                            <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-yellow-100/60 blur-[120px] rounded-full"></div>
+                            <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-gray-200/50 blur-[100px] rounded-full"></div>
+                        </div>
+
+                        {/* Login Card */}
+                        <div className="bg-white/80 backdrop-blur-xl p-8 md:p-10 rounded-[2.5rem] shadow-2xl border border-white max-w-md w-full animate-scale-up">
+                            <div className="text-center mb-8">
+                                <h1 className="font-serif text-4xl font-black text-black mb-2">Welcome Back.</h1>
+                                <p className="text-gray-500 font-medium text-sm">Sign in to track your orders and earn rewards.</p>
+                            </div>
+
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Email Address</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <i className="fas fa-envelope text-gray-400"></i>
+                                        </div>
+                                        <input 
+                                            type="email" 
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="you@example.com"
+                                            className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-black focus:bg-white focus:outline-none transition font-medium text-black"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-sm font-bold text-gray-700">Password</label>
+                                        <a href="#" className="text-xs font-bold text-foodies-yellow hover:text-yellow-500 transition">Forgot?</a>
+                                    </div>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <i className="fas fa-lock text-gray-400"></i>
+                                        </div>
+                                        <input 
+                                            type="password" 
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-black focus:bg-white focus:outline-none transition font-medium text-black"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <button 
+                                    type="submit"
+                                    className="w-full bg-black text-white font-bold text-lg p-4 rounded-xl shadow-lg hover:bg-gray-800 hover:-translate-y-1 transition-all duration-300 flex justify-center items-center space-x-2"
+                                >
+                                    <span>Sign In</span>
+                                    <i className="fas fa-arrow-right text-sm"></i>
+                                </button>
+                            </form>
+
+                            <div className="mt-8 text-center">
+                                <p className="text-gray-500 text-sm font-medium">
+                                    Don't have an account? <a href="signup.html" className="text-black font-black hover:text-foodies-yellow transition">Create one</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Minimal Dark Footer for Login Page */}
+                    <footer className="bg-black border-t border-gray-900 py-6 px-6 mt-auto relative z-10">
+                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center text-xs font-medium text-gray-500">
+                            <p>&copy; {new Date().getFullYear()} Foodies. All rights reserved.</p>
+                            <p className="mt-2 md:mt-0 flex items-center text-sm">
+                                Built with <i className="fas fa-heart text-foodies-yellow mx-1 animate-pulse"></i> for speed.
+                            </p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<LoginApp />);
+    </script>
+</body>
+</html>

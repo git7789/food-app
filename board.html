@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foodies | Order Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        foodies: { yellow: '#F5B301', darkText: '#111827' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Optimized Glassmorphism Utilities */
+        .glass-panel { 
+            background: rgba(255, 255, 255, 0.75); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(245, 179, 1, 0.2); 
+            box-shadow: 0 4px 20px 0 rgba(17, 24, 39, 0.05); 
+            transform: translateZ(0); 
+            will-change: transform;
+        }
+        
+        .dark .glass-panel { 
+            background: rgba(17, 24, 39, 0.85); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(245, 179, 1, 0.15); 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4); 
+            transform: translateZ(0);
+        }
+
+        /* Yellow & Dark Gray Mesh Gradient */
+        .mesh-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-color: #f3f4f6;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 179, 1, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 20%, rgba(17, 24, 39, 0.1) 0px, transparent 50%),
+                radial-gradient(at 20% 100%, rgba(245, 179, 1, 0.1) 0px, transparent 50%);
+        }
+
+        .dark .mesh-bg {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 179, 1, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 20%, rgba(17, 24, 39, 0.8) 0px, transparent 50%),
+                radial-gradient(at 20% 100%, rgba(245, 179, 1, 0.05) 0px, transparent 50%);
+        }
+    </style>
+</head>
+<body class="text-gray-800 dark:text-gray-200 font-sans h-screen overflow-hidden flex flex-col transition-colors duration-300 relative">
+    
+    <div class="mesh-bg"></div>
+    <div id="root" class="h-full w-full flex flex-col relative z-10"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function BoardApp() {
+            const [board, setBoard] = useState({ preparing: [], ready: [] });
+            const [isConnected, setIsConnected] = useState(false);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [theme, setTheme] = useState(localStorage.getItem('foodies_theme') || 'light');
+
+            useEffect(() => {
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [theme]);
+
+            useEffect(() => {
+                const handleStorage = () => {
+                    setTheme(localStorage.getItem('foodies_theme') || 'light');
+                };
+                window.addEventListener('storage', handleStorage);
+                return () => window.removeEventListener('storage', handleStorage);
+            }, []);
+
+            const fetchBoardData = async () => {
+                try {
+                    const response = await fetch('/api/board');
+                    if (response.ok) {
+                        const data = await response.json();
+                        setBoard(data);
+                        setIsConnected(true);
+                    } else {
+                        setIsConnected(false);
+                    }
+                } catch (error) {
+                    setIsConnected(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchBoardData();
+                const dataInterval = setInterval(fetchBoardData, 3000);
+                const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+                
+                return () => {
+                    clearInterval(dataInterval);
+                    clearInterval(timeInterval);
+                };
+            }, []);
+
+            return (
+                <div className="flex flex-col h-full w-full relative">
+                    
+                    {/* Compact Floating Glass Header matching KDS */}
+                    <nav className="sticky top-2 md:top-4 z-50 flex items-center justify-between glass-panel rounded-full px-4 md:px-8 py-2 mx-3 md:mx-4 shadow-lg shrink-0">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-8 h-8 rounded-full bg-gray-800 dark:bg-foodies-yellow flex items-center justify-center shadow-md border border-foodies-yellow dark:border-gray-900">
+                                <span className="font-black text-foodies-yellow dark:text-gray-900 text-xs">F</span>
+                            </div>
+                            <span className="font-serif font-black text-lg md:text-xl tracking-tight text-gray-900 dark:text-foodies-yellow drop-shadow-sm">Order Status</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black shadow-inner border tracking-widest uppercase ${isConnected ? 'border-foodies-yellow text-gray-900 dark:text-foodies-yellow bg-foodies-yellow/10' : 'border-gray-500 text-gray-500 bg-gray-200 dark:bg-gray-800'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-foodies-yellow animate-pulse' : 'bg-gray-500'}`}></div>
+                                <span className="hidden sm:inline">{isConnected ? 'SYSTEM ONLINE' : 'OFFLINE'}</span>
+                                <span className="inline sm:hidden">{isConnected ? 'ONLINE' : 'OFFLINE'}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-gray-800 dark:text-foodies-yellow font-black text-sm border-l border-gray-300 dark:border-gray-700 pl-4">
+                                <i className="fas fa-clock"></i>
+                                <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Compact Board Area */}
+                    <div className="flex-grow flex overflow-hidden pt-6 pb-16 mt-2">
+                        
+                        {/* Preparing Column */}
+                        <div className="w-1/2 flex flex-col h-full border-r border-gray-300/50 dark:border-gray-700/50 px-4 lg:px-8">
+                            <div className="text-center pb-4 border-b border-gray-300/50 dark:border-gray-700/50 mb-4 shrink-0">
+                                <h2 className="text-3xl lg:text-4xl font-serif font-black text-gray-800 dark:text-gray-200 tracking-tight">Preparing</h2>
+                                <p className="text-gray-600 dark:text-gray-400 font-bold mt-1 text-xs lg:text-sm uppercase tracking-widest">Assembling your order</p>
+                            </div>
+                            
+                            <div className="flex-grow overflow-y-auto hide-scrollbar">
+                                {board.preparing.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                                        <i className="fas fa-utensils text-5xl mb-3 opacity-50"></i>
+                                        <h3 className="text-xl font-black uppercase tracking-widest">Kitchen Clear</h3>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                                        {board.preparing.map(order => (
+                                            <div key={order.id} className="glass-panel flex flex-col rounded-xl p-3 border-l-4 border-gray-400 dark:border-gray-600 shadow-sm animate-fade-in transition-all">
+                                                <span className="text-3xl font-mono font-black text-gray-900 dark:text-white leading-none">#{order.id}</span>
+                                                <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 mt-1 uppercase tracking-wider truncate">{order.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Ready Column */}
+                        <div className="w-1/2 flex flex-col h-full px-4 lg:px-8">
+                            <div className="text-center pb-4 border-b border-gray-300/50 dark:border-gray-700/50 mb-4 shrink-0">
+                                <h2 className="text-3xl lg:text-4xl font-serif font-black text-gray-900 dark:text-white tracking-tight">Please Collect</h2>
+                                <p className="text-foodies-yellow font-black mt-1 text-xs lg:text-sm uppercase tracking-widest drop-shadow-sm">Ready at the counter</p>
+                            </div>
+                            
+                            <div className="flex-grow overflow-y-auto hide-scrollbar">
+                                {board.ready.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                                        <i className="fas fa-check-circle text-5xl mb-3 opacity-50"></i>
+                                        <h3 className="text-xl font-black uppercase tracking-widest">No orders waiting</h3>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                                        {board.ready.map(order => (
+                                            <div key={order.id} className="glass-panel flex flex-col rounded-xl p-4 border-l-4 border-foodies-yellow shadow-md border-t border-r border-b border-foodies-yellow/30 animate-fade-in transition-all bg-foodies-yellow/5 dark:bg-foodies-yellow/5">
+                                                <span className="text-4xl font-mono font-black text-gray-900 dark:text-foodies-yellow leading-none drop-shadow-sm">#{order.id}</span>
+                                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1.5 uppercase tracking-wider truncate">{order.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Preserved, Slightly Compacted Footer */}
+                    <footer className="w-full py-3 glass-panel border-t border-gray-300/50 dark:border-gray-700/50 text-center shrink-0 absolute bottom-0 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.02)] transition-colors duration-300 rounded-none border-x-0 border-b-0">
+                        <div className="flex items-center justify-center space-x-3 text-gray-600 dark:text-gray-400 font-bold text-[10px] tracking-[0.2em] uppercase">
+                            <span className="w-6 h-[1px] bg-gray-400 dark:bg-gray-600"></span>
+                            <p>System Developed by Bowen</p>
+                            <span className="w-6 h-[1px] bg-gray-400 dark:bg-gray-600"></span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<BoardApp />);
+    </script>
+    <style>
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</body>
+</html>
