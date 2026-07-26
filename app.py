@@ -7,7 +7,6 @@ import hashlib
 import os
 import json
 
-# Serve static files from the current folder
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
@@ -18,6 +17,9 @@ DB_FILE = "foodies_db.json"
 STAFF_USERNAME = "staff"
 STAFF_PIN = "2026"
 STAFF_PAGES = ['kds.html', 'dispatch.html', 'counter.html', 'board.html']
+
+# --- TEMPORARY MEMORY FOR EMAIL VERIFICATION ---
+pending_verifications = {}
 
 def check_auth(username, password):
     return username == STAFF_USERNAME and password == STAFF_PIN
@@ -38,12 +40,7 @@ default_menu = [
     {"id": 1, "name": "The Hustler Burger", "description": "Double beef patty, signature sauce, caramelized onions.", "price": 6.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/5-2-burger-png.png", "in_stock": True},
     {"id": 2, "name": "Classic Cheese", "description": "Single beef patty, cheddar slice, pickles, ketchup.", "price": 4.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/2-2-burger-free-download-png.png", "in_stock": True},
     {"id": 3, "name": "Crispy Chicken", "description": "Fried chicken breast, ranch dressing, lettuce, tomato.", "price": 5.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/6-2-burger-png-image.png", "in_stock": True},
-    {"id": 5, "name": "Nash Hot Wings", "description": "Crispy wings tossed in our fiery house sauce.", "price": 5.00, "category": "Wings", "image": "https://freepngimg.com/thumb/chicken/22156-3-fried-chicken-transparent-background.png", "in_stock": True},
-    {"id": 6, "name": "Honey BBQ Wings", "description": "Sweet and smoky BBQ glazed wings.", "price": 5.00, "category": "Wings", "image": "https://freepngimg.com/thumb/meat/33946-8-chicken-wings-photos.png", "in_stock": True},
-    {"id": 12, "name": "Street Fries", "description": "Loaded fries with cheese sauce and jalapeños.", "price": 3.50, "category": "Sides", "image": "https://freepngimg.com/thumb/french_fries/5-2-french-fries-png-hd.png", "in_stock": True},
-    {"id": 13, "name": "Onion Rings", "description": "Beer-battered onion rings with dip.", "price": 2.50, "category": "Sides", "image": "https://freepngimg.com/thumb/onion/140810-ring-onion-png-download-free.png", "in_stock": True},
-    {"id": 15, "name": "Vanilla Shake", "description": "Thick hand-spun vanilla shake.", "price": 3.00, "category": "Drinks", "image": "https://freepngimg.com/thumb/milkshake/25692-3-milkshake-file.png", "in_stock": True},
-    {"id": 17, "name": "Cola", "description": "Ice cold can.", "price": 1.00, "category": "Drinks", "image": "https://freepngimg.com/thumb/coca_cola/2-2-coca-cola-png-hd.png", "in_stock": True}
+    {"id": 5, "name": "Nash Hot Wings", "description": "Crispy wings tossed in our fiery house sauce.", "price": 5.00, "category": "Wings", "image": "https://freepngimg.com/thumb/chicken/22156-3-fried-chicken-transparent-background.png", "in_stock": True}
 ]
 
 def load_db():
@@ -63,7 +60,6 @@ def save_db():
     except Exception as e:
         print(f"[ERROR] Failed to save DB: {e}")
 
-# Load memory on startup
 orders_db, menu_db, users_db = load_db()
 
 @app.route('/', methods=['GET'])
@@ -71,25 +67,72 @@ def home():
     return send_from_directory('.', 'index.html')
 
 # --- Customer Authentication ---
+@app.route('/api/auth/request-code', methods=['POST'])
+def request_code():
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        username = data.get('username', '').strip()
+        
+        if not email or not username:
+            return jsonify({"error": "Email and username required"}), 400
+            
+        if username in users_db:
+            return jsonify({"error": "Username already exists"}), 400
+            
+        # Check if email is already used
+        for user in users_db.values():
+            if user.get('email') == email:
+                return jsonify({"error": "Email is already registered"}), 400
+
+        # Generate a 6-digit verification code
+        code = str(random.randint(100000, 999999))
+        
+        # Save to temporary memory
+        pending_verifications[email] = code
+        
+        print(f"[SYSTEM] Verification code for {email} is: {code}")
+        
+        # MOCK SYSTEM: We return the code to the frontend to display an alert,
+        # since we don't have a real email SMTP server running yet.
+        return jsonify({
+            "message": "Verification code sent!", 
+            "demo_code": code
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
     try:
         data = request.json
         username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
         password = data.get('password', '')
+        code = data.get('code', '').strip()
         
-        if not username or not password:
-            return jsonify({"error": "Username and password required"}), 400
-        if username in users_db:
-            return jsonify({"error": "Username already exists"}), 400
+        if not all([username, email, password, code]):
+            return jsonify({"error": "All fields and verification code are required"}), 400
             
+        # Verify the code
+        expected_code = pending_verifications.get(email)
+        if not expected_code or expected_code != code:
+            return jsonify({"error": "Invalid or expired verification code"}), 400
+            
+        # Create the account
         users_db[username] = {
             "username": username,
+            "email": email,
             "password": hash_password(password),
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         save_db()
-        return jsonify({"message": "Account created successfully", "username": username}), 201
+        
+        # Clear the pending verification
+        del pending_verifications[email]
+        
+        return jsonify({"message": "Account verified and created!", "username": username}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -112,42 +155,6 @@ def login():
 @app.route('/api/menu', methods=['GET'])
 def get_menu():
     return jsonify({"menu": menu_db}), 200
-
-@app.route('/api/menu', methods=['POST'])
-def add_menu_item():
-    try:
-        data = request.json
-        new_id = max([item['id'] for item in menu_db]) + 1 if menu_db else 1
-        new_item = {
-            "id": new_id,
-            "name": data.get('name'),
-            "description": data.get('description'),
-            "price": float(data.get('price')),
-            "category": data.get('category'),
-            "image": data.get('image'),
-            "in_stock": True
-        }
-        menu_db.append(new_item)
-        save_db()
-        return jsonify({"message": "Item added!", "item": new_item}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route('/api/menu/<int:item_id>', methods=['PUT'])
-def toggle_stock(item_id):
-    for item in menu_db:
-        if item['id'] == item_id:
-            item['in_stock'] = not item['in_stock']
-            save_db()
-            return jsonify({"message": "Stock status updated", "item": item}), 200
-    return jsonify({"error": "Item not found"}), 404
-
-@app.route('/api/menu/<int:item_id>', methods=['DELETE'])
-def delete_menu_item(item_id):
-    global menu_db
-    menu_db = [item for item in menu_db if item['id'] != item_id]
-    save_db()
-    return jsonify({"message": "Item deleted"}), 200
 
 # --- Order Core Logic ---
 @app.route('/api/orders', methods=['POST'])
@@ -186,8 +193,6 @@ def create_order():
         
         orders_db[order_id] = new_order
         save_db()
-        print(f"[ORDER PAID] #{order_id} saved. Waiting for customer arrival.")
-        
         return jsonify({
             "message": "Payment Successful! Show code at counter.",
             "order_id": order_id,
@@ -240,8 +245,6 @@ def scan_qr_code():
         order['scanned_at'] = datetime.now().strftime("%H:%M:%S")
         
         save_db()
-        print(f"[ARRIVAL] #{order_id} scanned. Ticket sent to Kitchen!")
-        
         return jsonify({
             "message": "Arrival confirmed! Assembling order now.",
             "order": order
@@ -255,13 +258,10 @@ def sweep_order():
     try:
         data = request.json
         order_id = str(data.get('order_id'))
-        
         if order_id in orders_db and orders_db[order_id]['status'] == 'waiting':
             del orders_db[order_id]
             save_db()
-            print(f"[SYSTEM SWEEP] #{order_id} removed.")
             return jsonify({"message": "Order swept!"}), 200
-            
         return jsonify({"error": "Order not found or cannot be swept"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -271,13 +271,10 @@ def complete_order():
     try:
         data = request.json
         order_id = str(data.get('order_id')) 
-        
         if order_id in orders_db:
             orders_db[order_id]['status'] = 'ready'
             save_db()
-            print(f"[READY] #{order_id} is assembled.")
             return jsonify({"message": "Order marked ready!"}), 200
-            
         return jsonify({"error": "Order not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -290,7 +287,6 @@ def undo_order():
         if order_id in orders_db and orders_db[order_id]['status'] == 'ready':
             orders_db[order_id]['status'] = 'cooking'
             save_db()
-            print(f"[UNDO] #{order_id} reverted back to kitchen.")
             return jsonify({"message": "Order reverted to cooking!"}), 200
         return jsonify({"error": "Order not found or cannot be undone"}), 404
     except Exception as e:
@@ -317,7 +313,6 @@ def clear_order():
                 orders_db[order_id]['status'] = 'collected'
                 orders_db[order_id]['collected_at'] = datetime.now().strftime("%H:%M:%S")
                 save_db()
-                print(f"[DISPATCHED] #{order_id} handed to customer.")
                 return jsonify({"success": True, "message": "Order collected!"}), 200
             else:
                 current_status = orders_db[order_id]['status'].upper()
@@ -352,7 +347,6 @@ def get_user_history(username):
     user_orders.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
     return jsonify({"history": user_orders}), 200
 
-# --- SERVE HTML PAGES WITH STAFF SECURITY ---
 @app.route('/<path:filename>')
 def serve_html(filename):
     if filename in STAFF_PAGES:
@@ -363,11 +357,7 @@ def serve_html(filename):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    # If running in a cloud environment (like Render), it will use the PORT variable
-    # If running locally, it defaults to 5000 with the adhoc SSL
     if os.environ.get('RENDER'):
         app.run(host='0.0.0.0', port=port)
     else:
-        print(f"🚀 Foodies System running locally on Port {port} (SECURE HTTPS)")
-        print(f"🔒 Staff pages protected. Username: {STAFF_USERNAME} | PIN: {STAFF_PIN}")
         app.run(host='0.0.0.0', debug=True, port=port, ssl_context='adhoc')
