@@ -193,7 +193,6 @@
                     
                     if (res.ok) {
                         setAuthMode('verify');
-                        // MOCK ALERT: Since we don't have real SMTP, we alert the code to the user
                         alert(`DEMO MODE: Since no email server is attached, your verification code is: ${data.demo_code}`);
                     } else { setAuthError(data.error); }
                 } catch (error) { setAuthError('Network error connecting to server.'); } 
@@ -390,7 +389,6 @@
                         </div>
 
                         <div className="flex items-center space-x-3">
-                            {/* Desktop Account Button */}
                             <div className="hidden sm:flex items-center">
                                 {currentUser ? (
                                     <div className="flex items-center space-x-3 glass-panel rounded-full px-4 py-2 border border-white">
@@ -524,7 +522,24 @@
                         )}
                     </main>
 
-                    <footer id="about" className="glass-panel border-t border-white/50 pt-16 pb-8 mt-12 shrink-0 relative z-10 w-full">
+                    {/* --- FULLY UPDATED FOOTER SECTION --- */}
+                    <footer className="glass-panel border-t border-white/50 pt-16 pb-8 mt-12 shrink-0 relative z-10 w-full">
+                        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+                            <div id="about">
+                                <h3 className="font-serif text-3xl font-black text-black mb-4">About Foodies.</h3>
+                                <p className="text-gray-700 font-bold leading-relaxed max-w-sm">
+                                    We are revolutionizing the way you order food. No more waiting in line. Just seamless mobile ordering and instant kitchen assembly.
+                                </p>
+                            </div>
+                            <div id="contact" className="md:text-right">
+                                <h3 className="font-serif text-3xl font-black text-black mb-4">Contact Us</h3>
+                                <div className="space-y-2 text-gray-700 font-bold">
+                                    <p><i className="fas fa-map-marker-alt text-foodies-yellow w-6"></i> 123 Culinary Ave, Food District</p>
+                                    <p><i className="fas fa-phone text-foodies-yellow w-6"></i> +263 77X XXX XXX</p>
+                                    <p><i className="fas fa-envelope text-foodies-yellow w-6"></i> hello@foodies.com</p>
+                                </div>
+                            </div>
+                        </div>
                         <div className="max-w-6xl mx-auto px-6 border-t border-gray-200/50 pt-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
                             <p className="text-gray-600 font-bold text-xs">© 2026 Foodies. All rights reserved.</p>
                             <div className="flex items-center space-x-3 text-gray-700 font-bold text-[10px] tracking-[0.25em] uppercase glass-panel px-4 py-2 rounded-full border border-white/80">
