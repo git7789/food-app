@@ -6,12 +6,29 @@ import hmac
 import hashlib
 import os
 import json
+from pymongo import MongoClient
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
 SECRET_KEY = b"my_super_secret_foodies_key_2026"
 DB_FILE = "foodies_db.json"
+
+# --- CLOUD DATABASE SETUP (MongoDB) ---
+# The server will automatically look for this environment variable
+MONGO_URI = os.environ.get("MONGO_URI")
+try:
+    if MONGO_URI:
+        client = MongoClient(MONGO_URI)
+        db = client["foodies_cloud"]
+        cloud_state = db["app_state"]
+        print("[SYSTEM] Connected to MongoDB Cloud successfully!")
+    else:
+        print("[WARNING] MONGO_URI not found. Using local ephemeral memory.")
+        cloud_state = None
+except Exception as e:
+    print(f"[ERROR] MongoDB Connection Failed: {e}")
+    cloud_state = None
 
 # --- STAFF SECURITY CREDENTIALS ---
 STAFF_USERNAME = "staff"
@@ -44,6 +61,15 @@ default_menu = [
 ]
 
 def load_db():
+    if cloud_state is not None:
+        try:
+            record = cloud_state.find_one({"_id": "main_state"})
+            if record:
+                return record.get('orders', {}), record.get('menu', default_menu), record.get('users', {})
+        except Exception as e:
+            print(f"[ERROR] Could not load from Mongo: {e}")
+            
+    # Fallback to local JSON if Mongo fails or is not configured locally
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
@@ -54,6 +80,18 @@ def load_db():
     return {}, default_menu, {}
 
 def save_db():
+    if cloud_state is not None:
+        try:
+            cloud_state.update_one(
+                {"_id": "main_state"},
+                {"$set": {"orders": orders_db, "menu": menu_db, "users": users_db}},
+                upsert=True
+            )
+            return
+        except Exception as e:
+            print(f"[ERROR] Failed to save to Mongo: {e}")
+            
+    # Fallback to local file saving
     try:
         with open(DB_FILE, 'w') as f:
             json.dump({"orders": orders_db, "menu": menu_db, "users": users_db}, f, indent=4)
@@ -93,8 +131,6 @@ def request_code():
         
         print(f"[SYSTEM] Verification code for {email} is: {code}")
         
-        # MOCK SYSTEM: We return the code to the frontend to display an alert,
-        # since we don't have a real email SMTP server running yet.
         return jsonify({
             "message": "Verification code sent!", 
             "demo_code": code
@@ -165,7 +201,7 @@ def create_order():
         account_username = data.get('account_username') 
         cart_items = data.get('items')
         total_price = data.get('total')
-        phone = data.get('phone') # Captures the phone number from frontend
+        phone = data.get('phone') 
 
         if not all([customer_name, cart_items, total_price]):
             return jsonify({"error": "Missing order details"}), 400
@@ -197,9 +233,7 @@ def create_order():
 
         # --- SMS NOTIFICATION SYSTEM ---
         if phone and len(phone) >= 9:
-            # Generates a direct link to the QR image they can open on their phone
             qr_link = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=FOODIES_ORDER:{order_id}:{signature}"
-            # In a production environment, you would pass this to the Twilio or EcoCash SMS API here
             print(f"\n[SMS SENT to +263{phone[-9:]}]")
             print(f"Message: Foodies Order #{order_id} placed! Tap link for your QR ticket: {qr_link}\n")
 
