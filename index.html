@@ -282,6 +282,9 @@
                 setIsProcessing(true);
                 const finalName = customerName.trim() === "" ? "Guest" : customerName.trim();
                 const formattedItems = cart.map(item => `${item.quantity}x ${item.name}`);
+                
+                // NEW: Send the phone number to the backend if using EcoCash
+                const phoneToSend = paymentMethod === 'ecocash' ? phoneNumber : null;
 
                 try {
                     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -292,7 +295,8 @@
                             name: finalName, 
                             account_username: currentUser ? currentUser.username : null,
                             items: formattedItems, 
-                            total: cartTotal.toFixed(2) 
+                            total: cartTotal.toFixed(2),
+                            phone: phoneToSend
                         })
                     });
                     const data = await response.json();
