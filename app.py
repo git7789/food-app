@@ -165,6 +165,7 @@ def create_order():
         account_username = data.get('account_username') 
         cart_items = data.get('items')
         total_price = data.get('total')
+        phone = data.get('phone') # Captures the phone number from frontend
 
         if not all([customer_name, cart_items, total_price]):
             return jsonify({"error": "Missing order details"}), 400
@@ -193,6 +194,15 @@ def create_order():
         
         orders_db[order_id] = new_order
         save_db()
+
+        # --- SMS NOTIFICATION SYSTEM ---
+        if phone and len(phone) >= 9:
+            # Generates a direct link to the QR image they can open on their phone
+            qr_link = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=FOODIES_ORDER:{order_id}:{signature}"
+            # In a production environment, you would pass this to the Twilio or EcoCash SMS API here
+            print(f"\n[SMS SENT to +263{phone[-9:]}]")
+            print(f"Message: Foodies Order #{order_id} placed! Tap link for your QR ticket: {qr_link}\n")
+
         return jsonify({
             "message": "Payment Successful! Show code at counter.",
             "order_id": order_id,
