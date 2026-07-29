@@ -57,7 +57,12 @@ default_menu = [
     {"id": 1, "name": "The Hustler Burger", "description": "Double beef patty, signature sauce, caramelized onions.", "price": 6.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/5-2-burger-png.png", "in_stock": True},
     {"id": 2, "name": "Classic Cheese", "description": "Single beef patty, cheddar slice, pickles, ketchup.", "price": 4.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/2-2-burger-free-download-png.png", "in_stock": True},
     {"id": 3, "name": "Crispy Chicken", "description": "Fried chicken breast, ranch dressing, lettuce, tomato.", "price": 5.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/6-2-burger-png-image.png", "in_stock": True},
-    {"id": 5, "name": "Nash Hot Wings", "description": "Crispy wings tossed in our fiery house sauce.", "price": 5.00, "category": "Wings", "image": "https://freepngimg.com/thumb/chicken/22156-3-fried-chicken-transparent-background.png", "in_stock": True}
+    {"id": 5, "name": "Nash Hot Wings", "description": "Crispy wings tossed in our fiery house sauce.", "price": 5.00, "category": "Wings", "image": "https://freepngimg.com/thumb/chicken/22156-3-fried-chicken-transparent-background.png", "in_stock": True},
+    {"id": 6, "name": "Golden Seasoned Fries", "description": "Crispy shoestring fries with our signature spice blend.", "price": 2.50, "category": "Sides", "image": "https://freepngimg.com/thumb/french_fries/5-2-french-fries-png.png", "in_stock": True},
+    {"id": 7, "name": "Spicy Chicken Wrap", "description": "Grilled chicken, lettuce, and spicy mayo in a toasted tortilla.", "price": 4.00, "category": "Wraps", "image": "https://freepngimg.com/thumb/sandwich/1-2-sandwich-png-picture.png", "in_stock": True},
+    {"id": 8, "name": "Ice Cold Cola", "description": "Chilled 500ml refreshing soda.", "price": 1.50, "category": "Drinks", "image": "https://freepngimg.com/thumb/coca_cola/5-2-coca-cola-png.png", "in_stock": True},
+    {"id": 9, "name": "Vanilla Thickshake", "description": "Creamy, classic vanilla bean milkshake.", "price": 3.50, "category": "Drinks", "image": "https://freepngimg.com/thumb/milkshake/2-2-milkshake-transparent.png", "in_stock": True},
+    {"id": 10, "name": "The Boss Nash Platter", "description": "Massive sharing board with wings, burgers, and loaded fries.", "price": 18.00, "category": "Combos", "image": "https://freepngimg.com/thumb/fast_food/1-2-fast-food-png-hd.png", "in_stock": True}
 ]
 
 def load_db():
