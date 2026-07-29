@@ -15,7 +15,6 @@ SECRET_KEY = b"my_super_secret_foodies_key_2026"
 DB_FILE = "foodies_db.json"
 
 # --- CLOUD DATABASE SETUP (MongoDB) ---
-# The server will automatically look for this environment variable
 MONGO_URI = os.environ.get("MONGO_URI")
 try:
     if MONGO_URI:
@@ -57,12 +56,18 @@ default_menu = [
     {"id": 1, "name": "The Hustler Burger", "description": "Double beef patty, signature sauce, caramelized onions.", "price": 6.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/5-2-burger-png.png", "in_stock": True},
     {"id": 2, "name": "Classic Cheese", "description": "Single beef patty, cheddar slice, pickles, ketchup.", "price": 4.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/2-2-burger-free-download-png.png", "in_stock": True},
     {"id": 3, "name": "Crispy Chicken", "description": "Fried chicken breast, ranch dressing, lettuce, tomato.", "price": 5.50, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/6-2-burger-png-image.png", "in_stock": True},
-    {"id": 5, "name": "Nash Hot Wings", "description": "Crispy wings tossed in our fiery house sauce.", "price": 5.00, "category": "Wings", "image": "https://freepngimg.com/thumb/chicken/22156-3-fried-chicken-transparent-background.png", "in_stock": True},
-    {"id": 6, "name": "Golden Seasoned Fries", "description": "Crispy shoestring fries with our signature spice blend.", "price": 2.50, "category": "Sides", "image": "https://freepngimg.com/thumb/french_fries/5-2-french-fries-png.png", "in_stock": True},
-    {"id": 7, "name": "Spicy Chicken Wrap", "description": "Grilled chicken, lettuce, and spicy mayo in a toasted tortilla.", "price": 4.00, "category": "Wraps", "image": "https://freepngimg.com/thumb/sandwich/1-2-sandwich-png-picture.png", "in_stock": True},
-    {"id": 8, "name": "Ice Cold Cola", "description": "Chilled 500ml refreshing soda.", "price": 1.50, "category": "Drinks", "image": "https://freepngimg.com/thumb/coca_cola/5-2-coca-cola-png.png", "in_stock": True},
-    {"id": 9, "name": "Vanilla Thickshake", "description": "Creamy, classic vanilla bean milkshake.", "price": 3.50, "category": "Drinks", "image": "https://freepngimg.com/thumb/milkshake/2-2-milkshake-transparent.png", "in_stock": True},
-    {"id": 10, "name": "The Boss Nash Platter", "description": "Massive sharing board with wings, burgers, and loaded fries.", "price": 18.00, "category": "Combos", "image": "https://freepngimg.com/thumb/fast_food/1-2-fast-food-png-hd.png", "in_stock": True}
+    {"id": 4, "name": "Chitown BBQ Rib Burger", "description": "Tender pork rib patty smothered in smoky BBQ sauce.", "price": 6.00, "category": "Burgers", "image": "https://freepngimg.com/thumb/burger/4-2-burger-png-picture.png", "in_stock": True},
+    {"id": 5, "name": "Nash Hot Wings", "description": "Crispy wings tossed in our fiery house sauce.", "price": 5.00, "category": "Chicken", "image": "https://freepngimg.com/thumb/chicken/22156-3-fried-chicken-transparent-background.png", "in_stock": True},
+    {"id": 6, "name": "2-Piece Fried Chicken & Chips", "description": "Two golden fried chicken pieces served with a portion of chips.", "price": 4.50, "category": "Chicken", "image": "https://freepngimg.com/thumb/fast_food/16-2-fast-food-transparent.png", "in_stock": True},
+    {"id": 7, "name": "Poshto Meat Feast Pizza", "description": "Loaded with pepperoni, beef, sausage, and extra cheese.", "price": 12.00, "category": "Pizza", "image": "https://freepngimg.com/thumb/pizza/2-2-pizza-png-pic.png", "in_stock": True},
+    {"id": 8, "name": "Golden Seasoned Fries", "description": "Crispy shoestring fries with our signature spice blend.", "price": 2.50, "category": "Sides", "image": "https://freepngimg.com/thumb/french_fries/5-2-french-fries-png.png", "in_stock": True},
+    {"id": 9, "name": "Crispy Onion Rings", "description": "Battered and deep-fried golden onion rings.", "price": 2.00, "category": "Sides", "image": "https://freepngimg.com/thumb/onion/10-2-onion-png-hd.png", "in_stock": True},
+    {"id": 10, "name": "Spicy Chicken Wrap", "description": "Grilled chicken, lettuce, and spicy mayo in a toasted tortilla.", "price": 4.00, "category": "Wraps", "image": "https://freepngimg.com/thumb/sandwich/1-2-sandwich-png-picture.png", "in_stock": True},
+    {"id": 11, "name": "Ice Cold Cola", "description": "Chilled 500ml refreshing soda.", "price": 1.50, "category": "Drinks", "image": "https://freepngimg.com/thumb/coca_cola/5-2-coca-cola-png.png", "in_stock": True},
+    {"id": 12, "name": "Mazoe Orange Crush", "description": "The classic, refreshing Zim orange cordial over ice.", "price": 1.00, "category": "Drinks", "image": "https://freepngimg.com/thumb/orange_juice/2-2-orange-juice-png-pic.png", "in_stock": True},
+    {"id": 13, "name": "Vanilla Thickshake", "description": "Creamy, classic vanilla bean milkshake.", "price": 3.50, "category": "Drinks", "image": "https://freepngimg.com/thumb/milkshake/2-2-milkshake-transparent.png", "in_stock": True},
+    {"id": 14, "name": "Chocolate Fudge Sundae", "description": "Soft serve ice cream topped with hot chocolate fudge.", "price": 2.50, "category": "Desserts", "image": "https://freepngimg.com/thumb/ice_cream/4-2-ice-cream-png-image.png", "in_stock": True},
+    {"id": 15, "name": "The Boss Nash Platter", "description": "Massive sharing board with wings, burgers, and loaded fries.", "price": 18.00, "category": "Combos", "image": "https://freepngimg.com/thumb/fast_food/1-2-fast-food-png-hd.png", "in_stock": True}
 ]
 
 def load_db():
@@ -74,7 +79,7 @@ def load_db():
         except Exception as e:
             print(f"[ERROR] Could not load from Mongo: {e}")
             
-    # Fallback to local JSON if Mongo fails or is not configured locally
+    # Fallback to local JSON
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
@@ -123,17 +128,12 @@ def request_code():
         if username in users_db:
             return jsonify({"error": "Username already exists"}), 400
             
-        # Check if email is already used
         for user in users_db.values():
             if user.get('email') == email:
                 return jsonify({"error": "Email is already registered"}), 400
 
-        # Generate a 6-digit verification code
         code = str(random.randint(100000, 999999))
-        
-        # Save to temporary memory
         pending_verifications[email] = code
-        
         print(f"[SYSTEM] Verification code for {email} is: {code}")
         
         return jsonify({
@@ -156,12 +156,10 @@ def signup():
         if not all([username, email, password, code]):
             return jsonify({"error": "All fields and verification code are required"}), 400
             
-        # Verify the code
         expected_code = pending_verifications.get(email)
         if not expected_code or expected_code != code:
             return jsonify({"error": "Invalid or expired verification code"}), 400
             
-        # Create the account
         users_db[username] = {
             "username": username,
             "email": email,
@@ -169,8 +167,6 @@ def signup():
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         save_db()
-        
-        # Clear the pending verification
         del pending_verifications[email]
         
         return jsonify({"message": "Account verified and created!", "username": username}), 201
